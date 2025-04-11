@@ -503,3 +503,6 @@ window.addEventListener('load', () => {
 
 
 -![全功能云盘构建思路-下载管理](https://github.com/sun12yyds/cloud-drive/blob/main/Advanced%20build%20solutions.md)
+
+
+-![上传文件完整构建方法](https://github.com/sun12yyds/cloud-drive/blob/main/File%20upload%20and%20construction%20plan.md)
