@@ -45,3 +45,57 @@ OAuth App（用户登录）：
 
 回调地址：https://yourusername.github.io/cloud-drive/auth
 ```
+
+🔒 第二章：文件加密系统实现
+2.1 前端加密流程
+```javascript
+// public/js/crypto.js
+const CRYPTO_CONFIG = {
+  name: 'AES-GCM',
+  length: 256,
+  iterations: 100000
+};
+
+async function deriveKey(password, salt) {
+  const baseKey = await crypto.subtle.importKey(
+    "raw", 
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+  
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: CRYPTO_CONFIG.iterations,
+      hash: "SHA-256"
+    },
+    baseKey,
+    { name: CRYPTO_CONFIG.name, length: CRYPTO_CONFIG.length },
+    true,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encryptFile(file, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(password, salt);
+  const encrypted = await crypto.subtle.encrypt(
+    { name: CRYPTO_CONFIG.name, iv },
+    key,
+    await file.arrayBuffer()
+  );
+
+  return {
+    meta: {
+      salt: Array.from(salt),
+      iv: Array.from(iv),
+      iterations: CRYPTO_CONFIG.iterations
+    },
+    data: new Uint8Array(encrypted)
+  };
+}
+```
