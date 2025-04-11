@@ -500,3 +500,4 @@ window.addEventListener('load', () => {
 # 结语：至此，你已经完成了个人网盘的搭建，fork或者点个关注呗！
 # 扩展阅读建议：
 ![API管理和下载管理](https://github.com/sun12yyds/cloud-drive/blob/main/Read%20more.md)
+![全功能云盘构建思路-下载管理](https://github.com/sun12yyds/cloud-drive/blob/main/Advanced%20build%20solutions.md)
