@@ -189,3 +189,312 @@ if (window.location.pathname === '/auth') {
   auth.handleCallback();
 }
 ```
+
+3.2 安全注意事项
+永远不要在前端存储 client_secret
+
+使用代理服务器处理 OAuth 流程（示例 Node.js 代理）：
+
+```javascript
+// proxy-server.js
+const express = require('express');
+const axios = require('axios');
+const app = express();
+
+app.get('/exchange-code', async (req, res) => {
+  const { code } = req.query;
+  
+  const response = await axios.post('https://github.com/login/oauth/access_token', {
+    client_id: process.env.GH_CLIENT_ID,
+    client_secret: process.env.GH_CLIENT_SECRET,
+    code
+  }, {
+    headers: { Accept: 'application/json' }
+  });
+
+  res.json(response.data);
+});
+
+app.listen(3000);
+```
+
+# 📁 第四章：文件管理系统实现
+4.1 文件上传组件
+```javascript
+// public/js/uploader.js
+class FileUploader {
+  constructor(token) {
+    this.token = token;
+    this.chunkSize = 5 * 1024 * 1024; // 5MB分片
+  }
+
+  async upload(file, path, progressCallback) {
+    const totalChunks = Math.ceil(file.size / this.chunkSize);
+    const fileHash = await this.calculateHash(file);
+    
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = file.slice(i * this.chunkSize, (i+1)*this.chunkSize);
+      const content = await this.readChunk(chunk);
+      
+      await fetch(`https://api.github.com/repos/${REPO}/contents/${path}_part${i}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `token ${this.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: `Uploading ${file.name} part ${i+1}/${totalChunks}`,
+          content: btoa(content)
+        })
+      });
+      
+      progressCallback((i+1)/totalChunks * 100);
+    }
+    
+    await this.mergeParts(file.name, totalChunks);
+  }
+
+  async calculateHash(file) {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    return Array.from(new Uint8Array(hashBuffer))
+               .map(b => b.toString(16).padStart(2,'0'))
+               .join('');
+  }
+}
+```
+4.2 文件预览实现
+```html
+<!-- public/preview.html -->
+<div class="preview-container">
+  <div id="pdf-viewer" class="hidden"></div>
+  <img id="image-viewer" class="hidden">
+  <pre id="text-viewer" class="hidden"></pre>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<script>
+class FilePreview {
+  static async show(fileUrl) {
+    const extension = fileUrl.split('.').pop().toLowerCase();
+    
+    switch(extension) {
+      case 'pdf':
+        this.showPDF(fileUrl);
+        break;
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+        this.showImage(fileUrl);
+        break;
+      default:
+        this.showText(fileUrl);
+    }
+  }
+
+  static async showPDF(url) {
+    const loadingTask = pdfjsLib.getDocument(url);
+    const pdf = await loadingTask.promise;
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      
+      const viewport = page.getViewport({ scale: 1.5 });
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+      
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+      
+      document.getElementById('pdf-viewer').appendChild(canvas);
+    }
+  }
+}
+</script>
+```
+运行 HTML
+# 🚀 第五章：部署与持续集成
+5.1 前端部署配置
+```bash
+# 安装 gh-pages 部署工具
+npm install gh-pages --save-dev
+
+# package.json 添加脚本
+{
+  "scripts": {
+    "deploy": "gh-pages -d public -b gh-pages"
+  }
+}
+
+# 运行部署
+npm run deploy
+```
+5.2 GitHub Actions 自动化
+```
+创建 .github/workflows/sync.yml：
+```
+
+```yaml
+name: Auto Sync
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 3 * * *'  # 每天UTC 3点同步
+
+jobs:
+  sync-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build and deploy
+        run: |
+          npm run build
+          npm run deploy
+        env:
+          GH_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
+```
+# 📱 第六章：移动端优化
+6.1 响应式布局
+```css
+/* public/css/mobile.css */
+@media (max-width: 768px) {
+  .file-item {
+    flex-direction: column;
+    padding: 8px;
+  }
+
+  .upload-box {
+    padding: 10px;
+    margin: 10px 0;
+  }
+
+  .preview-container {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* 手势操作优化 */
+.touch-area {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+```
+6.2 离线支持
+创建 public/sw.js：
+
+```javascript
+const CACHE_NAME = 'cloud-drive-v1';
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/css/styles.css',
+  '/js/main.js'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(ASSETS))
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => response || fetch(event.request))
+  );
+});
+```
+# 🔧 第七章：安全加固
+7.1 密钥管理
+```bash
+# 使用 GitHub Secrets 存储敏感信息
+# 在仓库 Settings > Secrets > Actions 添加：
+- AES_KEY: 加密主密钥
+- GH_DEPLOY_TOKEN: 部署用Token
+- OAUTH_SECRET: OAuth客户端密钥
+```
+7.2 CSP 配置
+在 public/index.html 添加：
+
+```html
+<meta http-equiv="Content-Security-Policy" 
+      content="default-src 'self';
+               script-src 'self' https://cdnjs.cloudflare.com;
+               img-src 'self' data:;
+               style-src 'self' 'unsafe-inline';
+               connect-src 'self' https://api.github.com;">
+```
+运行 HTML
+7.3 审计日志
+创建 .github/workflows/audit.yml：
+
+```yaml
+name: Security Audit
+on: [push, pull_request]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run npm audit
+        run: npm audit --production
+        
+      - name: Check for secrets
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
+```
+# 🛠️ 调试与维护
+实时日志查看：
+```bash
+# 跟踪 GitHub Actions 日志
+gh run watch
+```
+本地开发服务器：
+
+```bash
+python3 -m http.server 8000 --directory public/
+```
+性能监控：
+
+```javascript
+
+// 添加性能追踪
+window.addEventListener('load', () => {
+  const [timing] = performance.getEntriesByType('navigation');
+  console.log('页面加载时间:', timing.duration);
+});
+```
+以上为完整实现方案，每个步骤都包含可直接运行的代码示例。实际部署时请务必：
+
+
+替换所有 YOUR_CLIENT_ID 等占位符
+
+
+通过 GitHub 
+
+
+在正式环境使用 HTTPS
+
+
+定期轮换加密密钥
+
+# 结语：至此，你已经完成了个人网盘的搭建，fork或者点个关注呗！
