@@ -22,3 +22,26 @@ git checkout -b backend  # 后端代码分支（私有）
 git checkout -b gh-pages # 前端代码分支（公开）
 ```
 
+1.3 配置仓库权限
+仓库 Settings > Collaborators > 添加主账号为管理员
+
+Settings > Branches > 添加保护规则：
+```
+     Require pull request reviews
+
+     Require status checks
+```
+
+1.4 生成访问凭证
+经典Token（文件操作）：
+```
+权限：repo, workflow, admin:org
+```
+生成地址：https://github.com/settings/tokens/new
+```
+OAuth App（用户登录）：
+```
+注册地址：https://github.com/settings/developers
+
+回调地址：https://yourusername.github.io/cloud-drive/auth
+```
