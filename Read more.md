@@ -2,7 +2,7 @@
 
 # 📥 方法一：直接下载（公开文件）
 1. 前端下载按钮实现
-···javascript
+```javascript
 // public/js/download.js
 class FileDownloader {
   static async downloadFile(fileInfo) {
