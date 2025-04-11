@@ -46,7 +46,7 @@ OAuth App（用户登录）：
 回调地址：https://yourusername.github.io/cloud-drive/auth
 ```
 
-🔒 第二章：文件加密系统实现
+# 🔒 第二章：文件加密系统实现
 2.1 前端加密流程
 ```javascript
 // public/js/crypto.js
@@ -97,5 +97,95 @@ async function encryptFile(file, password) {
     },
     data: new Uint8Array(encrypted)
   };
+}
+```
+
+2.2 后端解密工作流
+```
+创建 .github/workflows/decrypt.yml：
+```
+```yaml
+name: File Decryption
+on:
+  workflow_dispatch:
+    inputs:
+      filename:
+        description: 'Encrypted file name'
+        required: true
+      password:
+        description: 'Decryption password'
+        required: true
+
+jobs:
+  decrypt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Decrypt file
+        env:
+          FILENAME: ${{ github.event.inputs.filename }}
+          PASSWORD: ${{ github.event.inputs.password }}
+        run: |
+          openssl enc -d -aes-256-gcm \
+            -in "$FILENAME" \
+            -out "decrypted_$FILENAME" \
+            -k "$PASSWORD" -pbkdf2
+          
+      - uses: actions/upload-artifact@v3
+        with:
+          name: decrypted-file
+          path: decrypted_*
+```
+
+# 👥 第三章：多账户登录系统
+3.1 OAuth 登录流程
+```javascript
+// public/js/auth.js
+class AuthManager {
+  constructor(clientId) {
+    this.clientId = clientId;
+    this.redirectUri = `${window.location.origin}/auth`;
+  }
+
+  startLogin() {
+    const state = crypto.randomUUID();
+    localStorage.setItem('oauth_state', state);
+    
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      scope: 'repo',
+      state: state
+    });
+    
+    window.location = `https://github.com/login/oauth/authorize?${params}`;
+  }
+
+  async handleCallback() {
+    const code = new URLSearchParams(window.location.search).get('code');
+    const state = localStorage.getItem('oauth_state');
+    
+    const response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      body: JSON.stringify({
+        client_id: this.clientId,
+        client_secret: 'YOUR_CLIENT_SECRET',  // 必须通过后端代理
+        code,
+        state
+      })
+    });
+    
+    const { access_token } = await response.json();
+    localStorage.setItem('github_token', access_token);
+  }
+}
+```
+```
+// 使用示例
+const auth = new AuthManager('YOUR_CLIENT_ID');
+if (window.location.pathname === '/auth') {
+  auth.handleCallback();
 }
 ```
