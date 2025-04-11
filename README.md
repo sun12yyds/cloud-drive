@@ -13,3 +13,12 @@
 开启双重认证（Settings > Security）
 
 
+1.2 创建私有仓库
+```bash
+# 创建并初始化仓库
+git init cloud-drive
+cd cloud-drive
+git checkout -b backend  # 后端代码分支（私有）
+git checkout -b gh-pages # 前端代码分支（公开）
+```
+
