@@ -38,7 +38,6 @@ Settings > Branches > 添加保护规则：
 权限：repo, workflow, admin:org
 ```
 生成地址：https://github.com/settings/tokens/new
-```
 OAuth App（用户登录）：
 
 注册地址：https://github.com/settings/developers
